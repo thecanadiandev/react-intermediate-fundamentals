@@ -30,3 +30,9 @@ const TodoList = () => {
 
 - For react query, if the component is unmounted, or if number of observers becomes zero, the query becomes inactive and is garbage collected and removed from cache.
 - All queries will be inactive after 5 mins. (configurable)
+- RQ automatially refreshes stale data in 3 situations
+  - when network is reconnected
+  - component is mounted
+  - window is refocused
+- If data is stale, RQ attempts to fetch fresh data from backend while returning same data from cache to components.
+-
