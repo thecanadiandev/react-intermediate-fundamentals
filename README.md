@@ -1,22 +1,27 @@
-# Playground Start
+### Explanations
 
-This is the starter code for the playground project we use in part 2 of my React course. 
+The problem with coupling state with effect within a component is that,
 
-## Getting Started
+```js
+const TodoList = () => {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [error, setError] = useState('');
 
-To get started, follow these steps:
+  useEffect(() => {
+    axios
+      .get('https://jsonplaceholder.typicode.com/todos')
+      .then((res) => setTodos(res.data))
+      .catch((error) => setError(error));
+  }, []);
+}
+```
 
-1. Clone this repository to your local machine.
-2. Run `npm install` to install the required dependencies.
-3. Run `npm run dev` to start the web server. 
-
-## About the Course
-
-This repository belongs to part 2 of my React course covering intermediate-level topics. 
-
-- Fetching and updating data with React Query
-- All about reducers, context, and providers
-- Managing application state with Zustand
-- Routing with React Router 
-
-You can find the course at https://codewithmosh.com
+- we cannot cancel when unmounted
+- By default, strict mode runs twice, so we need to cancel the request, else request runs twice.
+- Querying logic is leaked to component
+- Need to move them to hook
+- No retry.
+- No auto refresh. If the data changes while the page is shown, it doesnt refresh
+- No caching
+- Rather than writing more code to address, we can use React Query. Redux is a state management library.
+  Not a cache, just an object. Also, needs more boilerplate code. So redux is no longer needed for caching. Do not use redux just for caching.
