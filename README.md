@@ -35,4 +35,48 @@ const TodoList = () => {
   - component is mounted
   - window is refocused
 - If data is stale, RQ attempts to fetch fresh data from backend while returning same data from cache to components.
--
+
+### Query config
+
+- rather than passing a config to global query client, it is better to do it on a per query basis
+
+```js
+// main.ts => Global settings
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 3,
+      cacheTime: 300_000, // 5 min, inactive, removed from cache and garbage collected.
+      staleTime: 10 * 1000, // how long data is considered fresh. After 10 sec, its considered stale data
+      // refetchOnWindowFocus: false,
+      // refetchOnReconnect: false,
+      // refetchOnMount: true
+    }
+  }
+});
+
+// Per query
+const usePosts = () => useQuery<Post[], Error>({
+  queryKey: ['posts'],
+  queryFn: () => axios
+    .get<Post[]>('https://jsonplaceholder.typicode.com/posts').then(res => res.data),
+  staleTime: 1 * 60 * 1000 // 1 minute
+})
+
+// Another example
+
+const useTodos = () => {
+  const fetchTodos = () =>
+    axios
+      .get<Todo[]>('https://jsonplaceholder.typicode.com/todos')
+      .then((res) => res.data);
+
+  // benefits: auto retry, auto refresh , caching,
+  return useQuery<Todo[], Error>({
+    queryKey: ['todos'],
+    queryFn: fetchTodos,
+    staleTime: 10 * 1000
+  });
+}
+```
