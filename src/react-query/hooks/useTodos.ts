@@ -1,24 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
-
-interface Todo {
-  id: number;
-  title: string;
-  userId: number;
-  completed: boolean;
-}
+import { CACHE_KEY_TODOS } from "../constants";
+import todoService, { Todo } from "../services/todoService";
 
 const useTodos = () => {
-  const fetchTodos = () =>
-    axios
-      .get<Todo[]>('https://jsonplaceholder.typicode.com/todos')
-      .then((res) => res.data);
-
-  // benefits: auto retry, auto refresh , caching, 
   return useQuery<Todo[], Error>({
-    queryKey: ['todos'],
-    queryFn: fetchTodos,
-    staleTime: 10 * 1000
+    queryKey: CACHE_KEY_TODOS,
+    queryFn: todoService.getAll,
+    staleTime: 0
   });
 }
 export default useTodos;

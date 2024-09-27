@@ -306,3 +306,380 @@ const PostList = () => {
   );
 };
 ```
+
+### Mutate data
+
+```js
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
+import { Todo } from "./hooks/useTodos";
+import axios from "axios";
+
+const TodoForm = () => {
+  const queryClient = useQueryClient();
+  const addTodo = useMutation({
+    mutationFn: (todo: Todo) =>
+      axios
+        .post<Todo>("https://jsonplaceholder.typicode.com/todos", todo)
+        .then((res) => res.data),
+    onSuccess: (savedTodo, newTodo) => {
+      // INVALIDATE CACHE: SO REFETCH WILL BRING LATEST
+      // queryClient.invalidateQueries({
+      //   queryKey: ['todos'] // wont work with JSON placeholder
+      // })
+      // UPDATE DATA IN CACHE DIRECTLY
+      queryClient.setQueryData<Todo[]>(["todos"], (todos) => {
+        return [savedTodo, ...(todos || [])];
+      });
+    },
+  });
+  const ref = useRef<HTMLInputElement>(null);
+
+  return (
+    <form
+      className="row mb-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ref.current && ref.current.value) {
+          addTodo.mutate({
+            id: 0,
+            title: ref.current?.value,
+            completed: false,
+            userId: 1,
+          });
+        }
+      }}
+    >
+      ...
+    </form>
+  );
+};
+
+export default TodoForm;
+
+```
+
+### Mutation error handling
+
+```js
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
+import { Todo } from "./hooks/useTodos";
+import axios from "axios";
+
+const TodoForm = () => {
+  const queryClient = useQueryClient();
+  const addTodo = useMutation<Todo, Error, Todo>({
+    mutationFn: (todo: Todo) =>
+      axios
+        .post<Todo>("https://jsonplaceholder.typicode.com/todos", todo)
+        .then((res) => res.data),
+    onSuccess: (savedTodo, newTodo) => {
+      queryClient.setQueryData<Todo[]>(["todos"], (todos) => {
+        return [savedTodo, ...(todos || [])];
+      });
+      if (ref.current) ref.current.value = "";
+    },
+  });
+  const ref = useRef<HTMLInputElement>(null);
+
+  return (
+    <>
+      {addTodo.error && (
+        <div className="alert alert-danger"> {addTodo.error.message} </div>
+      )}
+      <form
+        className="row mb-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (ref.current && ref.current.value) {
+            addTodo.mutate({
+              id: 0,
+              title: ref.current?.value,
+              completed: false,
+              userId: 1,
+            });
+          }
+        }}
+      >
+        <div className="col">
+          <input ref={ref} type="text" className="form-control" />
+        </div>
+        <div className="col">
+          <button className="btn btn-primary">Add</button>
+        </div>
+      </form>
+    </>
+  );
+};
+
+export default TodoForm;
+
+```
+
+### Showing progress
+
+```js
+<button disabled={addTodo.isLoading} className="btn btn-primary">
+  {addTodo.isLoading ? "Loading" : "Add"}
+</button>
+```
+
+### Optimistic updates
+
+```js
+
+const addTodo = useMutation<Todo, Error, Todo, AddTodoContext>({
+    mutationFn: (todo: Todo) =>
+      axios
+        .post<Todo>("https://jsonplaceholder.typicode.com/todosx", todo)
+        .then((res) => res.data),
+        // STEP 1: Implement this hook.
+    onMutate: (newTodo: Todo) => {
+      // Crete a context
+      const previousTodos = queryClient.getQueryData<Todo[]>(["todos"]) || [];
+      // OPTIMISTIC UPDATE - Update query cache right away
+      queryClient.setQueryData<Todo[]>(["todos"], (todos) => {
+        return [newTodo, ...(todos || [])];
+      });
+      if (ref.current) ref.current.value = "";
+      // STEP 2: Return a context object
+      return {
+        previousTodos,
+      };
+    },
+    onSuccess: (savedTodo, newTodo) => {
+      // REPLACE THE OBJECT WITH THE ONE FROM SERVER
+      // STEP 4: Replace the new todo with one received from server.
+      queryClient.setQueryData<Todo[]>(["todos"], (todos) =>
+        todos?.map((todo) => (todo === newTodo ? savedTodo : todo))
+      );
+    },
+    onError: (error, newTodo, context) => {
+      if (!context) {
+        return;
+      }
+      // STEP 3: Rollback to previous todos from context
+      queryClient.setQueryData<Todo[]>(["todos"], context.previousTodos);
+    },
+  });
+```
+
+### Custom mutation hook
+
+The component should delegate the logic to a hook
+
+```js
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Todo } from "./useTodos";
+import axios from "axios";
+import { CACHE_KEY_TODOS } from "../constants";
+
+interface AddTodoContext {
+  previousTodos: Todo[];
+}
+
+const useAddTodo = (onAdd: () => void) => {
+  const queryClient = useQueryClient();
+  return useMutation<Todo, Error, Todo, AddTodoContext>({
+    mutationFn: (todo: Todo) =>
+      axios
+        .post<Todo>("https://jsonplaceholder.typicode.com/todos", todo)
+        .then((res) => res.data),
+    onMutate: (newTodo: Todo) => {
+      const previousTodos = queryClient.getQueryData<Todo[]>(CACHE_KEY_TODOS) || [];
+      // OPTIMISTIC UPDATE
+      queryClient.setQueryData<Todo[]>(CACHE_KEY_TODOS, (todos = []) => {
+        return [newTodo, ...todos];
+      });
+
+      onAdd();
+
+      return {
+        previousTodos,
+      };
+    },
+    onSuccess: (savedTodo, newTodo) => {
+      // REPLACE THE OBJECT WITH THE ONE FROM SERVER
+      queryClient.setQueryData<Todo[]>(CACHE_KEY_TODOS, (todos) =>
+        todos?.map((todo) => (todo === newTodo ? savedTodo : todo))
+      );
+    },
+    onError: (error, newTodo, context) => {
+      if (!context) {
+        return;
+      }
+      queryClient.setQueryData<Todo[]>(CACHE_KEY_TODOS, context.previousTodos);
+    },
+  });
+}
+
+export default useAddTodo;
+
+// and in component
+const TodoForm = () => {
+  const ref = useRef<HTMLInputElement>(null);
+  const addTodo = useAddTodo(() => {
+    if (ref.current) ref.current.value = "";
+  });
+  ...
+}
+
+// constants.ts
+
+export const CACHE_KEY_TODOS = ['todos']
+```
+
+Here, we have single responsibility principle.
+
+- Component deals with markup & ui logic
+- Hook for data management.
+- This is called separation of concerns.
+
+### Reusable API client
+
+Querying logic is leaked to hooks.
+
+```js
+// Create a reusable apiClient.ts
+
+import axios from "axios";
+
+const axiosInstance = axios.create({
+  baseURL: "https://jsonplaceholder.typicode.com",
+});
+
+class APIClient<T> {
+  endpoint: string;
+  constructor(endpoint: string) {
+    this.endpoint = endpoint;
+  }
+  // make sure this is an arrow function
+  getAll = () => {
+    return axiosInstance.get<T[]>(this.endpoint).then((res) => res.data);
+  }
+  post = (data: T) => {
+    return axiosInstance.post<T>(this.endpoint, data).then((res) => res.data);
+  }
+}
+
+export default APIClient
+```
+
+and in useTodos hook,
+
+```js
+import { useQuery } from "@tanstack/react-query";
+import { CACHE_KEY_TODOS } from "../constants";
+import APIClient from "../services/apiClient";
+const apiClient = new APIClient<Todo>('/todos');
+
+export interface Todo {
+  id: number;
+  title: string;
+  userId: number;
+  completed: boolean;
+}
+
+const useTodos = () => {
+  return useQuery<Todo[], Error>({
+    queryKey: CACHE_KEY_TODOS,
+    queryFn: apiClient.getAll,
+    staleTime: 0
+  });
+}
+export default useTodos;
+
+// and in useAddTodos
+
+const apiClient = new APIClient<Todo>('/todos');
+mutationFn: apiClient.post,
+```
+
+### Reusable HTTP Service
+
+we need a single instance of API client
+
+```js
+// todoService.ts
+
+import APIClient from "./apiClient";
+
+export interface Todo {
+  id: number;
+  title: string;
+  userId: number;
+  completed: boolean;
+}
+export default new APIClient() < Todo > "/todos";
+
+//useTodos.ts
+
+import { useQuery } from "@tanstack/react-query";
+import { CACHE_KEY_TODOS } from "../constants";
+import todoService, { Todo } from "../services/todoService";
+
+const useTodos = () => {
+  return useQuery<Todo[], Error>({
+    queryKey: CACHE_KEY_TODOS,
+    queryFn: todoService.getAll,
+    staleTime: 0
+  });
+}
+export default useTodos;
+
+// and in useAddTodo.ts
+
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CACHE_KEY_TODOS } from "../constants";
+import todoService, { Todo } from "../services/todoService";
+
+interface AddTodoContext {
+  previousTodos: Todo[];
+}
+
+const useAddTodo = (onAdd: () => void) => {
+  const queryClient = useQueryClient();
+  return useMutation<Todo, Error, Todo, AddTodoContext>({
+    mutationFn: todoService.post,
+    onMutate: (newTodo: Todo) => {
+      const previousTodos = queryClient.getQueryData<Todo[]>(CACHE_KEY_TODOS) || [];
+      // OPTIMISTIC UPDATE
+      queryClient.setQueryData<Todo[]>(CACHE_KEY_TODOS, (todos = []) => {
+        return [newTodo, ...todos];
+      });
+
+      onAdd();
+
+      return {
+        previousTodos,
+      };
+    },
+    onSuccess: (savedTodo, newTodo) => {
+      // REPLACE THE OBJECT WITH THE ONE FROM SERVER
+      queryClient.setQueryData<Todo[]>(CACHE_KEY_TODOS, (todos) =>
+        todos?.map((todo) => (todo === newTodo ? savedTodo : todo))
+      );
+    },
+    onError: (error, newTodo, context) => {
+      if (!context) {
+        return;
+      }
+      queryClient.setQueryData<Todo[]>(CACHE_KEY_TODOS, context.previousTodos);
+    },
+  });
+}
+
+export default useAddTodo;
+```
+
+### Application layer
+
+The below hierarchy offers clean single responsibility for all layers.
+
+```
+Component - Uses hook to fetch/update data
+Custom hooks - Uses services / fetch/update data / logic for managing data in cache
+HTTP Services - instances of API client dedicated to working with specific type of objects(todoService, postService etc)
+API Client - The bottom layer, who handles sending http requests
+```
