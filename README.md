@@ -122,3 +122,61 @@ const { data, error, isLoading } = usePosts({
     pageSize,
   });
 ```
+
+### Infinite Queries
+
+```js
+interface PostQuery {
+  pageSize: number;
+}
+
+const usePosts = (query: PostQuery) => useInfiniteQuery<Post[], Error>({
+  queryKey: ['posts', query],
+  queryFn: ({ pageParam = 1 }) => axios
+    .get<Post[]>('https://jsonplaceholder.typicode.com/posts', {
+      params: {
+        _start: (pageParam - 1) + query.pageSize,
+        _limit: query.pageSize
+      }
+    }).then(res => res.data),
+  staleTime: 1 * 60 * 1000, // 1 minute
+  keepPreviousData: true,
+  getNextPageParam: (lastPage, allPages) => {
+    return lastPage.length > 0 ? allPages.length + 1 : undefined
+  }
+})
+
+// and in component
+
+const PostList = () => {
+  const pageSize = 10;
+  const { data, error, isLoading, fetchNextPage, isFetchingNextPage } =
+    usePosts({
+      pageSize,
+    });
+
+  return (
+    <>
+      <ul className="list-group">
+        {data.pages.map((page, index) => (
+          <React.Fragment key={index}>
+            {page.map((post) => (
+              <li key={post.id} className="list-group-item">
+                {post.title}
+              </li>
+            ))}
+          </React.Fragment>
+        ))}
+      </ul>
+
+      <button
+        onClick={() => fetchNextPage()}
+        disabled={isFetchingNextPage}
+        className="btn btn-primary my-3 ms-1"
+      >
+        Load more
+      </button>
+    </>
+  );
+};
+```
