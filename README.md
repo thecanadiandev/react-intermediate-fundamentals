@@ -25,3 +25,8 @@ const TodoList = () => {
 - No caching
 - Rather than writing more code to address, we can use React Query. Redux is a state management library.
   Not a cache, just an object. Also, needs more boilerplate code. So redux is no longer needed for caching. Do not use redux just for caching.
+
+### React Query points
+
+- For react query, if the component is unmounted, or if number of observers becomes zero, the query becomes inactive and is garbage collected and removed from cache.
+- All queries will be inactive after 5 mins. (configurable)
