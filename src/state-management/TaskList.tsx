@@ -1,28 +1,23 @@
-import { useState } from 'react';
-
-interface Task {
-  id: number;
-  title: string;
-}
+import { useContext } from "react";
+import TasksContext from "./contexts/taskContext";
 
 const TaskList = () => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-
+  const context = useContext(TasksContext);
   return (
     <>
       <button
         onClick={() =>
-          setTasks([
-            { id: Date.now(), title: 'Task ' + Date.now() },
-            ...tasks,
-          ])
+          context.dispatch({
+            type: "ADD",
+            task: { id: Date.now(), title: "Task " + Date.now() },
+          })
         }
         className="btn btn-primary my-3"
       >
         Add Task
       </button>
       <ul className="list-group">
-        {tasks.map((task) => (
+        {context.tasks.map((task) => (
           <li
             key={task.id}
             className="list-group-item d-flex justify-content-between align-items-center"
@@ -31,7 +26,7 @@ const TaskList = () => {
             <button
               className="btn btn-outline-danger"
               onClick={() =>
-                setTasks(tasks.filter((t) => t.id !== task.id))
+                context.dispatch({ type: "DELETE", taskId: task.id })
               }
             >
               Delete

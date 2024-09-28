@@ -683,3 +683,192 @@ Custom hooks - Uses services / fetch/update data / logic for managing data in ca
 HTTP Services - instances of API client dedicated to working with specific type of objects(todoService, postService etc)
 API Client - The bottom layer, who handles sending http requests
 ```
+
+## State management
+
+A reducer takes state menegment logic outside a component & centralizes it.
+
+```js
+// counterReducer.ts
+
+interface Action {
+  type: "INCREMENT" | "DECREMENT" | "RESET";
+}
+const counterReducer = (state: number, action: Action): number => {
+  switch (action.type) {
+    case "INCREMENT": {
+      return state + 1;
+    }
+    case "DECREMENT": {
+      return state - 1;
+    }
+    case "RESET": {
+      return 0;
+    }
+  }
+};
+export default counterReducer;
+
+// Counter.tsx
+
+import counterReducer from "./reducers/counterReducer";
+
+const Counter = () => {
+  const [value, dispatch] = useReducer(counterReducer, 0);
+
+  return (
+    <div>
+      Counter ({value})
+      <button
+        onClick={() => dispatch({ type: "INCREMENT" })}
+        className="btn btn-primary mx-1"
+      >
+        Increment
+      </button>
+      <button
+        onClick={() => dispatch({ type: "RESET" })}
+        className="btn btn-primary mx-1"
+      >
+        Reset
+      </button>
+    </div>
+  );
+};
+```
+
+### Complex reducer
+
+```js
+interface Task {
+  id: number;
+  title: string;
+}
+
+interface AddTask {
+  type: "ADD";
+  task: Task;
+}
+
+interface DeleteTask {
+  type: "DELETE";
+  taskId: number;
+}
+
+type TaskAction = AddTask | DeleteTask;
+
+const tasksReducer = (tasks: Task[], action: TaskAction): Task[] => {
+  if (action.type === "ADD") {
+    return [action.task, ...tasks];
+  }
+  if (action.type === "DELETE") {
+    return tasks.filter((task) => task.id !== action.taskId);
+  } else return tasks;
+};
+export default tasksReducer;
+```
+
+## Context
+
+- Lifting state up to parents isnt easy.
+- Passing down as props beings tight coupling.
+- Context helps share data without middleman components.
+- Context is like a truck for transporting data
+
+```js
+// taskContext.ts
+
+import { Task, TaskAction } from "../reducers/tasksReducer";
+import { Dispatch, createContext } from 'react';
+
+interface TasksContextType {
+  tasks: Task,
+  dispatch: Dispatch<TaskAction>
+}
+
+const TasksContext = createContext<TasksContextType>({} as TasksContextType)
+
+export default TasksContext;
+```
+
+we can wrap the context anywhere in the hierarchy, and the children of that context gets access to it from anywhere down the tree.
+
+```js
+function App() {
+  const [tasks, dispatch] = useReducer(tasksReducer, []);
+  return (
+    <>
+      <TasksContext.Provider value={{ tasks, dispatch }}>
+        <NavBar />
+        <HomePage />
+      </TasksContext.Provider>
+    </>
+  );
+}
+```
+
+and then, we can grab the context and whatever it exposes.
+
+```js
+import { useContext } from "react";
+import TasksContext from "./contexts/taskContext";
+
+const TaskList = () => {
+  const context = useContext(TasksContext);
+  return (
+    <>
+      <button
+        onClick={() =>
+          context.dispatch({
+            type: "ADD",
+            task: { id: Date.now(), title: "Task " + Date.now() },
+          })
+        }
+        className="btn btn-primary my-3"
+      >
+        Add Task
+      </button>
+      <ul className="list-group">
+        {context.tasks.map((task) => (
+          <li
+            key={task.id}
+            className="list-group-item d-flex justify-content-between align-items-center"
+          >
+            <span className="flex-grow-1">{task.title}</span>
+            <button
+              className="btn btn-outline-danger"
+              onClick={() =>
+                context.dispatch({ type: "DELETE", taskId: task.id })
+              }
+            >
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+};
+
+export default TaskList;
+```
+
+or we can also use the Consumer type syntax within the JSX
+
+```js
+const NavBar = () => {
+  return (
+    <TasksContext.Consumer>
+      {(context) => {
+        return (
+          <nav className="navbar d-flex justify-content-between">
+            <span className="badge text-bg-secondary">
+              {context.tasks.length}
+            </span>
+            <LoginStatus />
+          </nav>
+        );
+      }}
+    </TasksContext.Consumer>
+  );
+};
+```
