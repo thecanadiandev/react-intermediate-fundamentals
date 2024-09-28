@@ -916,3 +916,112 @@ function App() {
   );
 }
 ```
+
+### Code organization
+
+We divide them by functional areas.
+
+```
+task/
+  reducer/
+  hooks/
+  context/
+  components/
+```
+
+When to use context?
+
+- every react has state/data that needs to be shared.
+- server & client state.
+- Avoid using context for sharing server state. Let react query manage server state.
+- Client state should not be handled by react query. Use local state + context for it.
+
+Context vs Redux?
+
+- Redux is a state management library.
+- Instead of local state, we store them in a global store
+- avoid prop drilling
+- context is just a transport mechanism.
+- Both allow to share data.
+
+### Zustand
+
+`npm i zustand@4.3.7`
+
+```js
+// counter/store.ts
+
+import { create } from "zustand";
+
+interface CounterStore {
+  counter: number;
+  increment: () => void;
+  reset: () => void;
+}
+
+const useCounterStore =
+  create <
+  CounterStore >
+  ((set) => ({
+    counter: 0,
+    increment: () => set((store) => ({ counter: store.counter + 1 })),
+    reset: () => set(() => ({ counter: 0 })),
+  }));
+
+export default useCounterStore;
+
+// and to use them,
+import useCounterStore from "./counter/store";
+
+const Counter = () => {
+  const { counter, increment, reset } = useCounterStore();
+
+  return (
+    <div>
+      Counter ({counter})
+      <button onClick={() => increment()} className="btn btn-primary mx-1">
+        Increment
+      </button>
+      <button onClick={() => reset()} className="btn btn-primary mx-1">
+        Reset
+      </button>
+    </div>
+  );
+};
+
+export default Counter;
+```
+
+### Prevent unnecessary renders with selectors
+
+- Below, the component re-renders only when counter slice changes.
+
+```js
+const NavBar = () => {
+  // care about only this property
+  const counter = useCounterStore((s) => s.counter);
+};
+```
+
+### Zustand devtools
+
+`npm i simple-zustand-devtools@1.1.0 , npm i -D @types/node`
+
+```js
+import { create } from "zustand";
+import { mountStoreDevtool } from 'simple-zustand-devtools';
+
+interface CounterStore {
+  ..
+}
+
+const useCounterStore = create<CounterStore>((set => ({
+  ..
+})))
+
+if (process.env.NODE_ENV === 'development') {
+  mountStoreDevtool('Counter Store', useCounterStore)
+}
+
+export default useCounterStore;
+```

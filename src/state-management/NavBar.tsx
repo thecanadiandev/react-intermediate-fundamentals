@@ -1,20 +1,16 @@
+import useCounterStore from "./counter/store";
 import LoginStatus from "./LoginStatus";
-import TasksContext from "./contexts/taskContext";
 
 const NavBar = () => {
+  const counter = useCounterStore((s) => s.counter);
+  console.log("NAVBAR..");
   return (
-    <TasksContext.Consumer>
-      {(context) => {
-        return (
-          <nav className="navbar d-flex justify-content-between">
-            <span className="badge text-bg-secondary">
-              {context.tasks.length}
-            </span>
-            <LoginStatus />
-          </nav>
-        );
-      }}
-    </TasksContext.Consumer>
+    <>
+      <nav className="navbar d-flex justify-content-between">
+        <span className="badge text-bg-secondary">{counter}</span>
+        <LoginStatus />
+      </nav>
+    </>
   );
 };
 
