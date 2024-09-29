@@ -1025,3 +1025,259 @@ if (process.env.NODE_ENV === 'development') {
 
 export default useCounterStore;
 ```
+
+### Routing with react router
+
+`npm i react-router-dom@6.10.0`
+
+- Router have breaking changes. So install this specific version.
+
+```js
+// routes.tsx
+
+import { createBrowserRouter } from "react-router-dom";
+import HomePage from "./HomePage";
+import UserListPage from "./UserListPage";
+
+const router = createBrowserRouter([
+  { path: "/", element: <HomePage /> },
+  { path: "/users", element: <UserListPage /> },
+]);
+
+export default router;
+```
+
+and in main.tsx
+
+```js
+import { RouterProvider } from "react-router-dom";
+import router from "./routing/routes";
+
+<RouterProvider router={router} />;
+```
+
+To navigate
+
+```js
+import { Link } from "react-router-dom";
+<Link to="/users">Users</Link>;
+```
+
+and to programmatically navigate
+
+```js
+import { useNavigate } from "react-router-dom";
+
+const ContactPage = () => {
+  const navigate = useNavigate();
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        navigate("/");
+      }}
+    >
+      <button className="btn btn-primary">Submit</button>
+    </form>
+  );
+};
+```
+
+### Pass data with route params
+
+```js
+const router = createBrowserRouter([
+  { path: "/", element: <HomePage /> },
+  { path: "/users", element: <UserListPage /> },
+  { path: "/users/:id", element: <UserDetailPage /> },
+]);
+
+// and in template
+<Link to={`/users/${user.id}`}>{user.name}</Link>;
+```
+
+### Get data about current route
+
+```js
+import { useLocation, useParams, useSearchParams } from "react-router-dom";
+
+const UserDetailPage = () => {
+  const params = useParams();
+  // searchParams.toString(), serahParams.get('whatever')
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // search,path etc
+  const location = useLocation();
+
+  return <p>User {params.id} </p>;
+};
+
+export default UserDetailPage;
+```
+
+### Nested routes
+
+```js
+// Layout.tsx
+import { Outlet } from "react-router-dom";
+import NavBar from "./NavBar";
+
+const Layout = () => {
+  return (
+    <>
+      <NavBar />
+      <div id="main">
+        <Outlet />
+      </div>
+    </>
+  );
+};
+
+export default Layout;
+```
+
+and in routing config
+
+```js
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Layout />,
+    children: [
+      { index: true, element: <HomePage /> },
+      { path: "users", element: <UserListPage /> },
+      { path: "users/:id", element: <UserDetailPage /> },
+      { path: "contact", element: <ContactPage /> },
+    ],
+  },
+]);
+```
+
+with nested routes, we can arrange as
+
+```js
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Layout />,
+    children: [
+      { index: true, element: <HomePage /> },
+      {
+        path: "users",
+        element: <UsersPage />,
+        children: [{ path: ":id", element: <UserDetail /> }],
+      },
+    ],
+  },
+]);
+```
+
+### Styling active links
+
+```js
+<NavLink className="nav-link" to="/">
+  Home
+</NavLink>
+
+// custom class
+
+<NavLink className={({ isActive }) => isActive ? 'active nav-link' : 'nav-link' } to="/">
+    Home
+</NavLink>
+```
+
+### Handle errors
+
+- any error anywhere is caught at the root errorElement.
+
+```js
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Layout />,
+    errorElement: <ErrorPage />,
+  },
+]);
+
+// in ErrorPage
+
+import { isRouteErrorResponse, useRouteError } from "react-router-dom";
+
+const ErrorPage = () => {
+  const error = useRouteError();
+  const isInvalidRoute = isRouteErrorResponse(error);
+  return (
+    <>
+      <h1>Oops...</h1>
+      <p>{isInvalidRoute ? "Invalid page " : "Unexpected error"}</p>
+    </>
+  );
+};
+
+export default ErrorPage;
+```
+
+### Private routes
+
+```js
+import { Navigate, Outlet } from "react-router-dom";
+import UserListPage from "./UserList";
+import useAuth from "./hooks/useAuth";
+
+const UsersPage = () => {
+  const { user } = useAuth();
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+};
+```
+
+But this isnt scalable.
+
+### Layout Routes
+
+```js
+// PrivateRoutes.tsx
+
+import useAuth from "./hooks/useAuth";
+import { Navigate, Outlet } from "react-router-dom";
+
+const PrivateRoutes = () => {
+  const { user } = useAuth();
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+  return <Outlet />;
+};
+
+export default PrivateRoutes;
+
+// and in routes.ts
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Layout />,
+    errorElement: <ErrorPage />,
+    children: [
+      { index: true, element: <HomePage /> },
+      {
+        path: "login",
+        element: <LoginPage />,
+      },
+    ],
+  },
+  {
+    element: <PrivateRoutes />,
+    children: [
+      {
+        path: "users",
+        element: <UsersPage />,
+        children: [{ path: ":id", element: <UserDetail /> }],
+      },
+    ],
+  },
+]);
+
+export default router;
+```
